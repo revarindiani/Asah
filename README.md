@@ -10,7 +10,7 @@ Dashboard ini bertujuan memberikan informasi mengenai performa penjualan, ketepa
 submission/
 ├── dashboard/
 │   ├── dashboard.py
-│   └── main_data.csv
+│   └── data.csv
 ├── data/
 │   ├── category_translation.csv
 │   ├── customers.csv
