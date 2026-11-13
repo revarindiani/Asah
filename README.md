@@ -1,14 +1,39 @@
 # E-commerce Public Dataset Dashboard ✨
 
-Dashboard interaktif berbasis Streamlit untuk menganalisis Brazilian E-Commerce Public Dataset (Olist).
+Dashboard interaktif berbasis Streamlit untuk menganalisis **Brazilian E-Commerce Public Dataset (Olist)**.
 
-## Setup Environment - Shell/Terminal
+Dashboard ini bertujuan memberikan informasi mengenai performa penjualan, ketepatan pengiriman, ulasan pelanggan, performa kategori produk, serta segmentasi pelanggan menggunakan RFM Analysis.
 
-Pastikan Python sudah terinstal di komputer.
+## Struktur Folder
+
+```text
+submission/
+├── dashboard/
+│   ├── dashboard.py
+│   └── main_data.csv
+├── data/
+│   ├── category_translation.csv
+│   ├── customers.csv
+│   ├── geolocation.csv
+│   ├── order_items.csv
+│   ├── order_payments.csv
+│   ├── order_reviews.csv
+│   ├── orders.csv
+│   ├── products.csv
+│   └── sellers.csv
+├── notebook.ipynb
+├── README.md
+├── requirements.txt
+└── url.txt
+```
+
+## Setup Environment
+
+Pastikan Python sudah terinstal pada komputer.
 
 ```bash
 # Masuk ke folder proyek
-cd E-commerce-public-dataset-dashboard
+cd submission
 
 # Buat virtual environment
 python -m venv venv
@@ -16,36 +41,22 @@ python -m venv venv
 # Aktifkan virtual environment (Windows)
 venv\Scripts\activate
 
-# Install library yang dibutuhkan
+# Install dependencies
 pip install -r requirements.txt
-```
-
-## Struktur Folder
-
-```text
-E-commerce-public-dataset-dashboard/
-├── app.py
-├── requirements.txt
-├── README.md
-└── data
-    ├── orders.csv
-    ├── order_items.csv
-    ├── order_reviews.csv
-    ├── products.csv
-    ├── customers.csv
-    └── category_translation.csv
 ```
 
 ## Run Streamlit App
 
+Jalankan perintah berikut dari folder utama `submission\dashboard`:
+
 ```bash
-streamlit run app.py
+streamlit run dashboard/dashboard.py
 ```
 
-Dashboard dapat diakses melalui browser pada alamat:
+Dashboard dapat diakses melalui browser pada:
 
 ```text
-http://localhost:8501
+http://localhost:8503
 ```
 
 ## Analisis Dashboard
@@ -59,11 +70,12 @@ http://localhost:8501
 ## Catatan Metodologi
 
 - Analisis penjualan menggunakan pesanan berstatus `delivered`.
-- Total sales dan Monetary dihitung berdasarkan kolom `price`, tidak termasuk `freight_value`.
+- Total Sales dan Monetary dihitung berdasarkan kolom `price`, tidak termasuk `freight_value`.
 - Jumlah pesanan dihitung berdasarkan `order_id` unik.
 - Review digabung menjadi rata-rata satu skor per `order_id`.
 - RFM menggunakan `customer_unique_id`.
 - Analisis pengiriman hanya menggunakan pesanan dengan tanggal aktual, tanggal estimasi, dan review yang tersedia.
+- Analisis dilakukan berdasarkan periode September 2016 hingga Oktober 2018.
 
 ## Dependencies
 
@@ -71,3 +83,5 @@ http://localhost:8501
 - Pandas
 - NumPy
 - Plotly
+
+Lihat `requirements.txt` untuk daftar library dan versinya.
