@@ -17,6 +17,34 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+st.markdown("""
+<style>
+[data-testid="stMetric"] {
+    background-color: var(--secondary-background-color);
+    padding: 16px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    min-height: 110px;
+}
+
+[data-testid="stMetricLabel"] {
+    color: var(--text-color) !important;
+    font-size: 14px !important;
+}
+
+[data-testid="stMetricValue"] {
+    color: var(--text-color) !important;
+    font-size: clamp(20px, 1.8vw, 30px) !important;
+}
+
+[data-testid="stMetricValue"] > div {
+    overflow: visible !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 DATA_DIR = Path(__file__).parent / "data"
 
 REQUIRED_FILES = {
