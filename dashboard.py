@@ -12,7 +12,7 @@ st.set_page_config(
 )
 
 # dashboard.py berada di folder dashboard/, sedangkan CSV berada
-# di folder data/ yang sejajar dengan folder dashboard/.
+# di folder data/ yang sejajar dengan dashboard/.
 DASHBOARD_DIR = Path(__file__).resolve().parent
 DATA_DIR = DASHBOARD_DIR / "data"
 
