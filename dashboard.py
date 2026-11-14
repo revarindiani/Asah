@@ -1,3 +1,227 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+import plotly.express as px
+from io import BytesIO
+
+st.set_page_config(
+    page_title="Olist E-Commerce Dashboard",
+    page_icon="🛒",
+    layout="wide"
+)
+
+st.markdown("""
+<style>
+    .main {background-color: #f7f9fc;}
+    [data-testid="stMetric"] {
+        background: white; padding: 16px; border-radius: 12px;
+        border: 1px solid #e8edf4;
+    }
+    h1, h2, h3 {color: #17365D;}
+</style>
+""", unsafe_allow_html=True)
+
+st.title("🛒 Dashboard Analisis E-Commerce Olist")
+st.caption("Dashboard interaktif berdasarkan proyek Brazilian E-Commerce Public Dataset (Olist)")
+st.info(
+    "Unggah file CSV yang digunakan pada notebook. Dashboard ini memakai pesanan "
+    "berstatus delivered dan periode analisis default September 2016–Oktober 2018."
+)
+
+REQUIRED_FILES = {
+    "orders_dataset.csv": "Data pesanan",
+    "order_items_dataset.csv": "Detail item pesanan",
+    "order_reviews_dataset.csv": "Ulasan pelanggan",
+    "products_dataset.csv": "Data produk",
+    "product_category_name_translation.csv": "Terjemahan kategori",
+    "customers_dataset.csv": "Data pelanggan (untuk RFM)",
+}
+
+@st.cache_data(show_spinner="Membaca dan menyiapkan data...")
+def read_uploaded_csv(file_bytes, filename):
+    return pd.read_csv(BytesIO(file_bytes))
+
+@st.cache_data(show_spinner="Mengolah data dashboard...")
+def prepare_data(file_map):
+    orders = pd.read_csv(BytesIO(file_map["orders_dataset.csv"]))
+    items = pd.read_csv(BytesIO(file_map["order_items_dataset.csv"]))
+    reviews = pd.read_csv(BytesIO(file_map["order_reviews_dataset.csv"]))
+    products = pd.read_csv(BytesIO(file_map["products_dataset.csv"]))
+    translation = pd.read_csv(BytesIO(file_map["product_category_name_translation.csv"]))
+    customers = pd.read_csv(BytesIO(file_map["customers_dataset.csv"]))
+
+    date_cols = [
+        "order_purchase_timestamp",
+        "order_delivered_customer_date",
+        "order_estimated_delivery_date",
+    ]
+    for col in date_cols:
+        orders[col] = pd.to_datetime(orders[col], errors="coerce")
+
+    delivered = orders.loc[orders["order_status"].eq("delivered")].copy()
+    delivered = delivered.dropna(subset=["order_purchase_timestamp"])
+
+    # Data penjualan bulanan
+    sales_rows = delivered.merge(items, on="order_id", how="inner")
+    sales_rows["month"] = sales_rows["order_purchase_timestamp"].dt.to_period("M").dt.to_timestamp()
+    monthly = sales_rows.groupby("month").agg(
+        total_sales=("price", "sum"),
+        total_orders=("order_id", "nunique")
+    ).reset_index()
+
+    # Data ketepatan pengiriman dan ulasan: satu skor rata-rata per pesanan
+    reviews_one = reviews.groupby("order_id", as_index=False).agg(
+        review_score=("review_score", "mean")
+    )
+    delivery = delivered.dropna(subset=[
+        "order_delivered_customer_date", "order_estimated_delivery_date"
+    ]).merge(reviews_one, on="order_id", how="inner")
+    delivery["delivery_difference"] = (
+        delivery["order_delivered_customer_date"] -
+        delivery["order_estimated_delivery_date"]
+    ).dt.total_seconds() / 86400
+    delivery["delivery_status"] = np.where(
+        delivery["delivery_difference"] <= 0, "Tepat Waktu", "Terlambat"
+    )
+    delivery_summary = delivery.groupby("delivery_status").agg(
+        average_review=("review_score", "mean"),
+        total_orders=("order_id", "nunique")
+    ).reindex(["Tepat Waktu", "Terlambat"]).reset_index()
+
+    # Kontribusi kategori produk
+    product_rows = (
+        sales_rows.merge(
+            products[["product_id", "product_category_name"]],
+            on="product_id", how="left"
+        ).merge(translation, on="product_category_name", how="left")
+    )
+    category_col = "product_category_name_english"
+    if category_col not in product_rows.columns:
+        product_rows[category_col] = "Unknown"
+    product_rows[category_col] = product_rows[category_col].fillna("Unknown")
+    categories = product_rows.groupby(category_col).agg(
+        total_sales=("price", "sum"),
+        total_orders=("order_id", "nunique"),
+        total_items=("order_item_id", "count")
+    ).reset_index().rename(columns={category_col: "category"})
+
+    # RFM per pelanggan unik, mengikuti logika notebook
+    rfm_rows = (
+        delivered.merge(items, on="order_id", how="inner")
+        .merge(customers[["customer_id", "customer_unique_id"]], on="customer_id", how="left")
+    )
+    snapshot = rfm_rows["order_purchase_timestamp"].max() + pd.Timedelta(days=1)
+    rfm = rfm_rows.groupby("customer_unique_id").agg(
+        Recency=("order_purchase_timestamp", lambda x: (snapshot - x.max()).days),
+        Frequency=("order_id", "nunique"),
+        Monetary=("price", "sum")
+    ).reset_index()
+
+    if len(rfm) >= 4:
+        rfm["R_Score"] = pd.qcut(rfm["Recency"].rank(method="first"), 4, labels=[4, 3, 2, 1]).astype(int)
+        rfm["F_Score"] = pd.qcut(rfm["Frequency"].rank(method="first"), 4, labels=[1, 2, 3, 4]).astype(int)
+        rfm["M_Score"] = pd.qcut(rfm["Monetary"].rank(method="first"), 4, labels=[1, 2, 3, 4]).astype(int)
+        rfm["RFM_Score"] = rfm[["R_Score", "F_Score", "M_Score"]].sum(axis=1)
+        def segment(score):
+            if score >= 10: return "Champions"
+            if score >= 8: return "Loyal Customers"
+            if score >= 6: return "Potential Customers"
+            if score >= 4: return "At Risk"
+            return "Others"
+        rfm["Customer_Segment"] = rfm["RFM_Score"].apply(segment)
+    else:
+        rfm["Customer_Segment"] = "Belum dapat dikelompokkan"
+
+    return monthly, delivery_summary, delivery, categories, rfm, delivered
+
+with st.sidebar:
+    st.header("⚙️ Pengaturan Dashboard")
+    st.write("Unggah enam file CSV berikut. Nama file harus sesuai nama dataset.")
+    uploads = st.file_uploader(
+        "Pilih file dataset (CSV)",
+        type=["csv"],
+        accept_multiple_files=True
+    )
+
+file_map = {}
+if uploads:
+    for uploaded in uploads:
+        file_map[uploaded.name] = uploaded.getvalue()
+
+missing = [name for name in REQUIRED_FILES if name not in file_map]
+if missing:
+    st.warning("File yang masih diperlukan: " + ", ".join(missing))
+    st.markdown("**File yang perlu diunggah:**")
+    for filename, description in REQUIRED_FILES.items():
+        status = "✅" if filename in file_map else "⬜"
+        st.write(f"{status} `{filename}` — {description}")
+    st.stop()
+
+try:
+    monthly, delivery_summary, delivery, categories, rfm, delivered = prepare_data(file_map)
+except Exception as error:
+    st.error(f"Terjadi kesalahan saat mengolah dataset: {error}")
+    st.stop()
+
+min_date = delivered["order_purchase_timestamp"].min().date()
+max_date = delivered["order_purchase_timestamp"].max().date()
+
+with st.sidebar:
+    st.divider()
+    date_range = st.date_input(
+        "Periode analisis",
+        value=(max(min_date, pd.Timestamp("2016-09-01").date()),
+               min(max_date, pd.Timestamp("2018-10-31").date())),
+        min_value=min_date,
+        max_value=max_date
+    )
+    if isinstance(date_range, tuple) and len(date_range) == 2:
+        start_date, end_date = date_range
+    else:
+        start_date, end_date = min_date, max_date
+
+    top_n = st.slider("Jumlah kategori ditampilkan", 5, 20, 10)
+
+start_ts = pd.Timestamp(start_date)
+end_ts = pd.Timestamp(end_date) + pd.Timedelta(days=1)
+
+# Terapkan filter periode pada data transaksi
+filtered_orders = delivered[
+    delivered["order_purchase_timestamp"].between(start_ts, end_ts, inclusive="left")
+]
+filtered_order_ids = filtered_orders["order_id"].unique()
+filtered_monthly = monthly[
+    monthly["month"].between(start_ts.to_period("M").to_timestamp(),
+                             end_ts.to_period("M").to_timestamp(), inclusive="both")
+].copy()
+
+# Ringkasan penjualan dan pesanan
+filtered_items = filtered_orders[["order_id"]].merge(
+    pd.read_csv(BytesIO(file_map["order_items_dataset.csv"])),
+    on="order_id", how="inner"
+)
+total_sales = filtered_items["price"].sum()
+total_orders = filtered_orders["order_id"].nunique()
+total_customers = filtered_orders["customer_id"].nunique()
+average_order_value = total_sales / total_orders if total_orders else 0
+
+st.subheader("Ringkasan Kinerja")
+k1, k2, k3, k4 = st.columns(4)
+k1.metric("Total Penjualan", f"BRL {total_sales:,.2f}")
+k2.metric("Total Pesanan", f"{total_orders:,.0f}")
+k3.metric("Pelanggan", f"{total_customers:,.0f}")
+k4.metric("Rata-rata Nilai Pesanan", f"BRL {average_order_value:,.2f}")
+
+tab1, tab2, tab3, tab4 = st.tabs([
+    "📈 Penjualan", "🚚 Pengiriman & Ulasan", "📦 Kategori Produk", "👥 Segmentasi RFM"
+])
+
+with tab1:
+    st.subheader("Perkembangan Penjualan Bulanan")
+    if not filtered_monthly.empty:
+        left, right = st.columns(2)
+        with left:
+            fig = px.line(
                 filtered_monthly, x="month", y="total_sales", markers=True,
                 title="Total Penjualan per Bulan",
                 labels={"month": "Bulan", "total_sales": "Penjualan (BRL)"}
