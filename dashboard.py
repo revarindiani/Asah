@@ -16,6 +16,13 @@ st.set_page_config(
 DASHBOARD_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = DASHBOARD_DIR.parent
 DATA_DIR = PROJECT_DIR / "data"
+st.write("PROJECT DIR:", PROJECT_DIR)
+st.write("DATA DIR:", DATA_DIR)
+st.write("Apakah folder data tersedia:", DATA_DIR.exists())
+
+if DATA_DIR.exists():
+    st.write("Isi folder data:")
+    st.write([f.name for f in DATA_DIR.iterdir()])
 
 START_DATE = pd.Timestamp("2016-09-01")
 END_DATE_EXCLUSIVE = pd.Timestamp("2018-11-01")
