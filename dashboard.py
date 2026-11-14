@@ -14,11 +14,7 @@ st.set_page_config(
 # dashboard.py berada di folder dashboard/, sedangkan CSV berada
 # di folder data/ yang sejajar dengan folder dashboard/.
 DASHBOARD_DIR = Path(__file__).resolve().parent
-PROJECT_DIR = DASHBOARD_DIR.parent
-DATA_DIR = PROJECT_DIR / "data"
-st.write("PROJECT DIR:", PROJECT_DIR)
-st.write("DATA DIR:", DATA_DIR)
-st.write("Apakah folder data tersedia:", DATA_DIR.exists())
+DATA_DIR = DASHBOARD_DIR / "data"
 
 if DATA_DIR.exists():
     st.write("Isi folder data:")
