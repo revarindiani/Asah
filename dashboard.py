@@ -294,7 +294,10 @@ if page == "Overview":
     )
 
     c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Total Sales", money(total_sales))
+    c1.metric(
+    "Total Sales",
+    f"BRL {total_sales / 1_000_000:.2f}M"
+)
     c2.metric("Total Orders", f"{total_orders:,}")
     c3.metric("Customers", f"{total_customers:,}")
     c4.metric("Average Review", f"{avg_review:.2f} / 5")
